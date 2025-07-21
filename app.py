@@ -1,23 +1,29 @@
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request, send_file
 import feedparser
 from datetime import datetime
+import pandas as pd
+import hashlib
+from io import BytesIO
+import threading
 
 app = Flask(__name__)
 
 feeds = {
-    "Google News - Ministry of Steel": "https://news.google.com/rss/search?q=Ministry+of+Steel+India",
     "Google News - Steel Industry": "https://news.google.com/rss/search?q=Steel+Industry+India",
-    "Google News - SAIL": "https://news.google.com/rss/search?q=SAIL+Steel",
-    "Google News - NMDC": "https://news.google.com/rss/search?q=NMDC+Steel",
+    "Economic Times": "https://economictimes.indiatimes.com/rssfeeds/2146842.cms",
+    "Mint": "https://www.livemint.com/rss/opinion",
+    "Business Standard": "https://www.business-standard.com/rss/home_page_top_stories.rss",
     "PIB - Steel": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
 }
 
-keywords = ["steel", "ministry of steel", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "output"]
+keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
 
-def fetch_news(feeds, keywords):
+def fetch_news():
+    seen = set()
     news_items = []
     now = datetime.now()
+
     for source, url in feeds.items():
         feed = feedparser.parse(url)
         for entry in feed.entries:
@@ -27,21 +33,43 @@ def fetch_news(feeds, keywords):
                 continue
             if pub_date.month != now.month or pub_date.year != now.year:
                 continue
-            title = entry.get("title", "").lower()
-            summary = entry.get("summary", "").lower()
-            if any(keyword in title or summary for keyword in keywords):
-                news_items.append({
-                    "Date": pub_date.strftime("%Y-%m-%d"),
-                    "Title": entry.title,
-                    "Source": source,
-                    "Link": entry.link
-                })
+            title = entry.get("title", "")
+            summary = entry.get("summary", "")
+            if not any(keyword in title.lower() + summary.lower() for keyword in keywords):
+                continue
+            uid = hashlib.md5(title.encode()).hexdigest()
+            if uid in seen:
+                continue
+            seen.add(uid)
+            news_items.append({
+                "Date": pub_date.strftime("%Y-%m-%d"),
+                "Title": title,
+                "Source": source,
+                "Link": entry.link
+            })
     return news_items
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
-    news = fetch_news(feeds, keywords)
-    return render_template("index.html", news=news)
+    query = request.args.get("q", "").lower()
+    news = fetch_news()
+    if query:
+        news = [item for item in news if query in item['Title'].lower()]
+    return render_template("index.html", news=news, query=query)
+
+@app.route("/export/excel")
+def export_excel():
+    news = fetch_news()
+    df = pd.DataFrame(news)
+    output = BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+    return send_file(output, download_name="Steel_News.xlsx", as_attachment=True)
+
+@app.route("/export/pdf")
+def export_pdf():
+    # Placeholder for future implementation
+    return "PDF export is under construction."
 
 if __name__ == "__main__":
     app.run(debug=True)
