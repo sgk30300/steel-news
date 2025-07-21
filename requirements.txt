@@ -2,3 +2,4 @@ flask
 feedparser
 pandas
 openpyxl
+gunicorn
