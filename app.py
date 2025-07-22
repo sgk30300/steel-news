@@ -24,7 +24,8 @@ def fetch_news():
             title = entry.title
             link = entry.link
             date_published = entry.published if 'published' in entry else datetime.now().strftime('%a, %d %b %Y %H:%M:%S')
-            date_obj = datetime.strptime(date_published.replace(' GMT', ''), '%a, %d %b %Y %H:%M:%S')
+            date_clean = date_published.split(' GMT')[0].split(' +')[0].strip()
+            date_obj = datetime.strptime(date_clean, '%a, %d %b %Y %H:%M:%S')
             summary = BeautifulSoup(entry.summary, 'html.parser').text if 'summary' in entry else ''
             if 'steel' not in title.lower():
                 continue
