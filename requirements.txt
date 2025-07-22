@@ -5,5 +5,5 @@ feedparser
 pandas
 requests
 openpyxl
-transformers==4.41.1
-torch>=2.0
+transformers==4.21.1
+torch>=1.12.1
