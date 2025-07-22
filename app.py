@@ -1,12 +1,11 @@
 from flask import Flask, render_template, request
 import feedparser
-from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from dateutil import parser as date_parser
+from datetime import datetime
 import pytz
 
 app = Flask(__name__)
 
+# --- Feed URLs ---
 feeds = {
     "Google News - Steel Industry": "https://news.google.com/rss/search?q=Steel+Industry+India",
     "Economic Times": "https://economictimes.indiatimes.com/rssfeeds/2146842.cms",
@@ -15,101 +14,74 @@ feeds = {
     "PIB - Steel": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
 }
 
+# --- Keywords for steel-related filtering ---
 keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
 
-
-def clean_html(html):
-    return BeautifulSoup(html, "html.parser").get_text()
-
-
-def make_naive(dt):
-    if dt.tzinfo is not None:
-        return dt.astimezone().replace(tzinfo=None)
+# --- Normalize datetime to naive ---
+def normalize_datetime(dt):
+    if dt is None:
+        return None
+    if dt.tzinfo:
+        return dt.replace(tzinfo=None)
     return dt
 
-
-def fetch_news(source_filter=None, keyword_filter=None, month_filter=None):
-    all_items = []
+# --- Generate month filters ---
+def get_months():
+    months = set()
     now = datetime.now()
+    for i in range(12):
+        d = datetime(now.year, now.month, 1)
+        past = d.replace(month=((d.month - i - 1) % 12) + 1, year=d.year - ((i + 1) // 12))
+        months.add(past.strftime("%B %Y"))
+    return sorted(months, key=lambda m: datetime.strptime(m, "%B %Y"), reverse=True)
 
-    for source_name, url in feeds.items():
-        if source_filter and source_filter != source_name:
+# --- Fetch and filter news ---
+def fetch_news(keyword_filter=None, source_filter=None, month_filter=None):
+    news_items = []
+    for source, url in feeds.items():
+        if source_filter and source != source_filter:
             continue
-
         feed = feedparser.parse(url)
-
         for entry in feed.entries:
             title = entry.get("title", "")
-            summary = clean_html(entry.get("summary", ""))
             link = entry.get("link", "")
-            published_raw = entry.get("published", entry.get("updated", now.isoformat()))
+            published = entry.get("published_parsed", None)
+            if not published:
+                continue
+            published_date = normalize_datetime(datetime(*published[:6]))
 
-            try:
-                published = date_parser.parse(published_raw)
-            except Exception:
-                published = now
+            # Apply keyword filtering
+            if not any(kw.lower() in title.lower() for kw in keywords):
+                continue
 
-            if month_filter:
-                if published.year != month_filter.year or published.month != month_filter.month:
+            # Apply keyword search filtering
+            if keyword_filter and keyword_filter.lower() not in title.lower():
+                continue
+
+            # Apply month filtering
+            if month_filter and month_filter != "All Months":
+                if published_date.strftime("%B %Y") != month_filter:
                     continue
 
-            if keyword_filter:
-                keyword_match = any(kw.lower() in (title + summary).lower() for kw in keyword_filter)
-                if not keyword_match:
-                    continue
-
-            all_items.append({
+            news_items.append({
                 "title": title,
-                "summary": summary,
                 "link": link,
-                "source": source_name,
-                "published": published
+                "published": published_date,
+                "source": source
             })
 
-    all_items.sort(key=lambda x: make_naive(x["published"]), reverse=True)
-    return all_items
+    # Sort by date descending
+    news_items.sort(key=lambda x: x["published"], reverse=True)
+    return news_items
 
-
-def get_month_list():
-    now = datetime.now()
-    months = []
-    for i in range(12):
-        month = (now.month - i - 1) % 12 + 1
-        year = now.year if now.month - i > 0 else now.year - 1
-        label = f"{datetime(year, month, 1).strftime('%B %Y')}"
-        value = f"{year}-{month:02}"
-        months.append({"label": label, "value": value})
-    return months
-
-
-@app.route("/")
+# --- Flask route ---
+@app.route('/')
 def index():
-    selected_source = request.args.get("source")
-    selected_month = request.args.get("month")
+    keyword = request.args.get("keyword", "")
+    source = request.args.get("source", "")
+    month = request.args.get("month", "All Months")
+    news = fetch_news(keyword_filter=keyword, source_filter=source or None, month_filter=month)
+    return render_template("dashboard.html", news=news, months=["All Months"] + get_months(), sources=[""] + list(feeds.keys()), selected_month=month, selected_source=source, keyword=keyword)
 
-    month_dt = None
-    if selected_month:
-        try:
-            month_dt = datetime.strptime(selected_month, "%Y-%m")
-        except ValueError:
-            month_dt = None
-
-    news_items = fetch_news(
-        source_filter=selected_source,
-        keyword_filter=keywords,
-        month_filter=month_dt
-    )
-
-    months = get_month_list()
-    sources = list(feeds.keys())
-
-    return render_template("dashboard.html",
-                           news=news_items,
-                           selected_source=selected_source,
-                           selected_month=selected_month,
-                           months=months,
-                           sources=sources)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
