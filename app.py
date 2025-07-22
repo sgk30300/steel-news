@@ -21,7 +21,7 @@ feeds = {
     "Mint": "https://www.livemint.com/rss/industry"
 }
 
-def is_relevant(title, summary, keywords, threshold=2):
+def is_relevant(title, summary, keywords, threshold=1):
     text = (title + " " + summary).lower()
     return sum(kw in text for kw in keywords) >= threshold
 
@@ -35,8 +35,9 @@ def get_filtered_entries():
                 title = entry.title
                 summary = entry.get('summary', '')
 
-                if not is_relevant(title, summary, steel_keywords):
-                    continue
+                if source_name == "Google News - Steel Industry":
+                    if not is_relevant(title, summary, steel_keywords):
+                        continue
 
                 entries.append({
                     'title': title,
