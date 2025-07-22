@@ -1,87 +1,89 @@
 from flask import Flask, render_template, request
 import feedparser
-from datetime import datetime
-import pytz
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# --- Feed URLs ---
+# Enhanced keyword list
+steel_keywords = [
+    "steel", "tmt", "iron ore", "sponge iron", "steel plant", "rolling mill",
+    "steel production", "scrap metal", "smelter", "blast furnace", "nmdc",
+    "sail", "jsw", "jindal", "essar steel", "arcelor mittal", "rebar", "billets",
+    "ingots", "cold rolled", "hot rolled", "flat steel", "long steel",
+    "alloy steel", "metal prices", "ferrous", "non-ferrous", "steel imports",
+    "steel exports", "steel demand", "steel policy", "metal industry"
+]
+
+# Feeds from reliable sources
 feeds = {
-    "Google News - Steel Industry": "https://news.google.com/rss/search?q=Steel+Industry+India",
-    "Economic Times": "https://economictimes.indiatimes.com/rssfeeds/2146842.cms",
-    "Mint": "https://www.livemint.com/rss/opinion",
-    "Business Standard": "https://www.business-standard.com/rss/home_page_top_stories.rss",
-    "PIB - Steel": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
+    "Google News": "https://news.google.com/rss/search?q=steel+OR+iron+ore+OR+tmt+OR+metal+OR+sail+OR+nmdc&hl=en-IN&gl=IN&ceid=IN:en",
+    "Economic Times": "https://economictimes.indiatimes.com/industry/indl-goods/svs/steel/rssfeeds/13376306.cms",
+    "Mint": "https://www.livemint.com/rss/industry"
 }
 
-# --- Keywords for steel-related filtering ---
-keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
+def is_relevant(title, summary, keywords, threshold=2):
+    text = (title + " " + summary).lower()
+    return sum(kw in text for kw in keywords) >= threshold
 
-# --- Normalize datetime to naive ---
-def normalize_datetime(dt):
-    if dt is None:
-        return None
-    if dt.tzinfo:
-        return dt.replace(tzinfo=None)
-    return dt
-
-# --- Generate month filters ---
-def get_months():
-    months = set()
-    now = datetime.now()
-    for i in range(12):
-        d = datetime(now.year, now.month, 1)
-        past = d.replace(month=((d.month - i - 1) % 12) + 1, year=d.year - ((i + 1) // 12))
-        months.add(past.strftime("%B %Y"))
-    return sorted(months, key=lambda m: datetime.strptime(m, "%B %Y"), reverse=True)
-
-# --- Fetch and filter news ---
-def fetch_news(keyword_filter=None, source_filter=None, month_filter=None):
-    news_items = []
+def get_filtered_entries():
+    entries = []
     for source, url in feeds.items():
-        if source_filter and source != source_filter:
-            continue
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
-            title = entry.get("title", "")
-            link = entry.get("link", "")
-            published = entry.get("published_parsed", None)
-            if not published:
-                continue
-            published_date = normalize_datetime(datetime(*published[:6]))
+        d = feedparser.parse(url)
+        for entry in d.entries:
+            if hasattr(entry, 'published_parsed'):
+                published_dt = datetime(*entry.published_parsed[:6])
+                title = entry.title
+                summary = entry.get('summary', '')
 
-            # Apply keyword filtering
-            if not any(kw.lower() in title.lower() for kw in keywords):
-                continue
-
-            # Apply keyword search filtering
-            if keyword_filter and keyword_filter.lower() not in title.lower():
-                continue
-
-            # Apply month filtering
-            if month_filter and month_filter != "All Months":
-                if published_date.strftime("%B %Y") != month_filter:
+                if not is_relevant(title, summary, steel_keywords):
                     continue
 
-            news_items.append({
-                "title": title,
-                "link": link,
-                "published": published_date,
-                "source": source
-            })
+                entries.append({
+                    'title': title,
+                    'link': entry.link,
+                    'summary': summary,
+                    'date': published_dt,
+                    'source': source
+                })
+    return sorted(entries, key=lambda x: x['date'], reverse=True)
 
-    # Sort by date descending
-    news_items.sort(key=lambda x: x["published"], reverse=True)
-    return news_items
+def get_last_3_months():
+    now = datetime.now()
+    months = []
+    for i in range(3):
+        date = now - timedelta(days=i * 30)
+        months.append(date.strftime('%B %Y'))
+    return list(dict.fromkeys(months))  # remove duplicates
 
-# --- Flask route ---
-@app.route('/')
+@app.route("/", methods=["GET"])
 def index():
-    keyword = request.args.get("keyword", "")
-    source = request.args.get("source", "")
-    month = request.args.get("month", "All Months")
-    news = fetch_news(keyword_filter=keyword, source_filter=source or None, month_filter=month)
-    return render_template("dashboard.html", news=news, months=["All Months"] + get_months(), sources=[""] + list(feeds.keys()), selected_month=month, selected_source=source, keyword=keyword)
+    keyword = request.args.get("keyword", "").lower()
+    source = request.args.get("category", "")
+    month = request.args.get("month", "")
 
-if __name__ == '__main__':
+    news = get_filtered_entries()
+
+    # Filter by selected month
+    if month and month != "All Months":
+        news = [n for n in news if n['date'].strftime('%B %Y') == month]
+
+    # Filter by source
+    if source:
+        news = [n for n in news if n['source'] == source]
+
+    # Filter by keyword
+    if keyword:
+        news = [n for n in news if keyword in n['title'].lower() or keyword in n['summary'].lower()]
+
+    return render_template(
+        "dashboard.html",
+        news=news,
+        months=["All Months"] + get_last_3_months(),
+        sources=[""] + list(feeds.keys()),
+        selected_month=month,
+        selected_source=source,
+        keyword=keyword
+    )
+
+if __name__ == "__main__":
     app.run(debug=True)

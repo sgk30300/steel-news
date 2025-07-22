@@ -2,60 +2,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Steel News Dashboard by Hashtagsteel - Stay ahead with curated, real-time steel industry news from trusted sources like Mint, ET, and Google News.">
-  <title>Steel News Dashboard by Hashtagsteel</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content="Steel News Dashboard by Hashtagsteel - Latest steel industry news auto-updated every 15 minutes.">
+    <meta name="keywords" content="Steel News, TMT, Iron Ore, Metal, NMDC, SAIL, Steel Ministry, Steel Plants, Hashtagsteel">
+    <title>Steel News Dashboard by Hashtagsteel</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
-  <div class="relative">
-    <img src="{{ url_for('static', filename='banner.jpg') }}" class="w-full h-60 object-cover" alt="Steel Banner" />
-    <div class="absolute top-0 left-0 w-full h-full bg-black bg-opacity-40 flex items-center justify-center">
-      <h1 class="text-white text-3xl md:text-4xl font-bold drop-shadow">Stay Ahead with Curated Steel Industry News</h1>
-    </div>
-  </div>
-
-  <div class="max-w-6xl mx-auto py-6 px-4">
-    <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <input type="text" name="search" placeholder="Search..." value="{{ search_query }}" class="px-4 py-2 border rounded w-full" />
-
-      <select name="source" class="px-4 py-2 border rounded w-full">
-        <option value="">All Sources</option>
-        {% for s in unique_sources %}
-          <option value="{{ s }}" {% if selected_source == s %}selected{% endif %}>{{ s }}</option>
-        {% endfor %}
-      </select>
-
-      <select name="month" class="px-4 py-2 border rounded w-full">
-        <option value="">All Months</option>
-        {% for m in unique_months %}
-          <option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>{{ m.label }}</option>
-        {% endfor %}
-      </select>
-
-      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Apply Filters</button>
-    </form>
-
-    {% if news %}
-      <div class="grid gap-6">
-        {% for item in news %}
-        <div class="bg-white rounded-lg shadow p-6 flex flex-col justify-between">
-          <div>
-            <h2 class="text-lg font-semibold mb-1">{{ item.title }}</h2>
-            <p class="text-sm text-gray-500">{{ item.published.strftime('%d %B %Y') }} — <span class="font-semibold">{{ item.source }}</span></p>
-          </div>
-          <div class="mt-4 text-right">
-            <a href="{{ item.link }}" target="_blank" class="inline-flex items-center bg-blue-100 text-blue-800 text-sm font-medium px-4 py-2 rounded hover:bg-blue-200 transition">Read Article →</a>
-          </div>
+<body class="bg-gray-50 text-gray-800">
+    <header class="w-full bg-white shadow sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto flex items-center justify-between p-4">
+            <img src="/static/banner.jpg" alt="Steel News Banner" class="h-16 object-cover w-full rounded" />
         </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="text-center text-gray-500 text-lg mt-12">No news found matching your filters.</div>
-    {% endif %}
-  </div>
+    </header>
 
-  <div class="text-center py-6 text-sm text-gray-400">Auto-refreshes every 15 minutes · Powered by Hashtagsteel</div>
+    <main class="max-w-6xl mx-auto p-4">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
+            <form method="get" class="flex flex-wrap gap-4 w-full md:w-auto">
+                <select name="month" onchange="this.form.submit()" class="px-4 py-2 rounded bg-white border shadow">
+                    {% for m in months %}
+                    <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="category" onchange="this.form.submit()" class="px-4 py-2 rounded bg-white border shadow">
+                    {% for s in sources %}
+                    <option value="{{ s }}" {% if s == selected_source %}selected{% endif %}>{{ s if s else 'All Sources' }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="text" name="keyword" placeholder="Search keyword..." value="{{ keyword }}" class="px-4 py-2 rounded border shadow w-full md:w-auto"/>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">Search</button>
+            </form>
+        </div>
+
+        {% if news %}
+        <div class="grid gap-6">
+            {% for item in news %}
+            <div class="p-4 bg-white rounded shadow hover:shadow-md transition">
+                <a href="{{ item.link }}" target="_blank" class="text-xl font-semibold text-blue-700 hover:underline">{{ item.title }}</a>
+                <p class="text-sm text-gray-500 mt-1">{{ item.date.strftime('%d %B %Y') }} — <span class="font-semibold">{{ item.source }}</span></p>
+                <p class="mt-2 text-gray-700 text-sm">{{ item.summary }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-20 bg-white rounded shadow">
+            <h2 class="text-2xl font-semibold text-gray-600 mb-2">No steel-related news found</h2>
+            <p class="text-gray-500">Try changing filters or check back later. News updates every 15 minutes.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <footer class="text-center text-sm text-gray-500 mt-10 p-4 border-t">
+        Steel News Dashboard by Hashtagsteel · Auto-updated every 15 mins
+    </footer>
 </body>
 </html>
