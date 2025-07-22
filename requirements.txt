@@ -1,7 +1,9 @@
 flask
 gunicorn
+beautifulsoup4
 feedparser
-openpyxl
 pandas
 requests
-beautifulsoup4
+openpyxl
+transformers==4.41.1
+torch>=2.0
