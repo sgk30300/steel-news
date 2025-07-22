@@ -28,14 +28,15 @@ def is_relevant(title, summary, keywords, threshold=1):
 def get_filtered_entries():
     entries = []
     for source, url in feeds.items():
-        d = feedparser.parse(url)
-        for entry in d.entries:
+        feed = feedparser.parse(url)
+        for entry in feed.entries:
             if hasattr(entry, 'published_parsed'):
                 published_dt = datetime(*entry.published_parsed[:6])
                 title = entry.title
                 summary = entry.get('summary', '')
 
-                if source_name == "Google News - Steel Industry":
+                # ✅ Apply keyword filtering only to Google News
+                if source == "Google News":
                     if not is_relevant(title, summary, steel_keywords):
                         continue
 
@@ -46,6 +47,7 @@ def get_filtered_entries():
                     'date': published_dt,
                     'source': source
                 })
+
     return sorted(entries, key=lambda x: x['date'], reverse=True)
 
 def get_last_3_months():
@@ -54,7 +56,7 @@ def get_last_3_months():
     for i in range(3):
         date = now - timedelta(days=i * 30)
         months.append(date.strftime('%B %Y'))
-    return list(dict.fromkeys(months))  # remove duplicates
+    return list(dict.fromkeys(months))
 
 @app.route("/", methods=["GET"])
 def index():
@@ -64,15 +66,12 @@ def index():
 
     news = get_filtered_entries()
 
-    # Filter by selected month
     if month and month != "All Months":
         news = [n for n in news if n['date'].strftime('%B %Y') == month]
 
-    # Filter by source
     if source:
         news = [n for n in news if n['source'] == source]
 
-    # Filter by keyword
     if keyword:
         news = [n for n in news if keyword in n['title'].lower() or keyword in n['summary'].lower()]
 
