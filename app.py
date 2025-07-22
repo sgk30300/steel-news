@@ -1,51 +1,57 @@
 
 from flask import Flask, render_template, request
+from bs4 import BeautifulSoup
 import feedparser
+import pandas as pd
+import requests
 from datetime import datetime
-import pytz
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-# RSS Feeds
-FEEDS = {
-    'Google News': 'https://news.google.com/rss/search?q=steel+industry+india',
-    'Economic Times': 'https://economictimes.indiatimes.com/rssfeeds/1977021501.cms',
-    'Mint': 'https://www.livemint.com/rss/industry'
+RSS_FEEDS = {
+    'Google News': 'https://news.google.com/rss/search?q=steel&hl=en-IN&gl=IN&ceid=IN:en',
+    'Economic Times': 'https://economictimes.indiatimes.com/rssfeeds/industry/indl-goods-/-svs/steel/rssfeeds/13376752.cms',
+    'Mint': 'https://www.livemint.com/rss/companies',
+    'GMK Center': 'https://gmk.center/en/feed/'
 }
 
-def fetch_articles():
+def fetch_news():
     articles = []
-    seen_links = set()
-    for source, url in FEEDS.items():
+    for source, url in RSS_FEEDS.items():
         feed = feedparser.parse(url)
         for entry in feed.entries:
-            if entry.link in seen_links:
+            title = entry.title
+            link = entry.link
+            date_published = entry.published if 'published' in entry else datetime.now().strftime('%a, %d %b %Y %H:%M:%S')
+            date_obj = datetime.strptime(date_published, '%a, %d %b %Y %H:%M:%S')
+            summary = BeautifulSoup(entry.summary, 'html.parser').text if 'summary' in entry else ''
+            if 'steel' not in title.lower():
                 continue
-            seen_links.add(entry.link)
-            pub_date = getattr(entry, 'published', getattr(entry, 'updated', ''))
             articles.append({
-                'title': entry.title,
-                'link': entry.link,
-                'published': pub_date,
-                'source': source
+                'date': date_obj,
+                'source': source,
+                'title': title,
+                'summary': summary,
+                'link': link
             })
-    articles.sort(key=lambda x: x['published'], reverse=True)
-    return articles
+    return sorted(articles, key=lambda x: x['date'], reverse=True)
 
-@app.route("/", methods=["GET"])
+@app.route('/', methods=['GET'])
 def dashboard():
-    articles = fetch_articles()
-    keyword = request.args.get("keyword", "").lower()
-    source_filter = request.args.get("source", "")
-    date_filter = request.args.get("date", "")
-    if keyword:
-        articles = [a for a in articles if keyword in a["title"].lower()]
-    if source_filter:
-        articles = [a for a in articles if a["source"] == source_filter]
-    if date_filter:
-        articles = [a for a in articles if date_filter in a["published"]]
-    sources = list(FEEDS.keys())
-    return render_template("dashboard.html", articles=articles, sources=sources)
+    news_data = fetch_news()
+    search_query = request.args.get('search', '').lower()
+    month_filter = request.args.get('month', '')
 
-if __name__ == "__main__":
+    filtered_news = news_data
+    if search_query:
+        filtered_news = [n for n in filtered_news if search_query in n['title'].lower()]
+    if month_filter:
+        filtered_news = [n for n in filtered_news if n['date'].strftime('%Y-%m') == month_filter]
+
+    unique_months = sorted(set(n['date'].strftime('%Y-%m') for n in news_data), reverse=True)
+
+    return render_template('dashboard.html', news=filtered_news, search_query=search_query, unique_months=unique_months, selected_month=month_filter)
+
+if __name__ == '__main__':
     app.run(debug=True)
