@@ -1,86 +1,86 @@
+# ---------------- app.py ----------------
 from flask import Flask, render_template, request
 import feedparser
 from datetime import datetime
-from dateutil import parser as dateparser
-import re
+from urllib.parse import quote
 
 app = Flask(__name__)
 
+# Define RSS feeds
 feeds = {
     "Google News": "https://news.google.com/rss/search?q=Steel+Industry+India",
     "Economic Times": "https://economictimes.indiatimes.com/rssfeeds/2146842.cms",
-    "Mint": "https://www.livemint.com/rss/opinion",
-    "Business Standard": "https://www.business-standard.com/rss/home_page_top_stories.rss",
-    "PIB": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
+    "Mint": "https://www.livemint.com/rss/opinion"
 }
 
-keywords = [
-    "steel", "ministry", "sail", "nmdc", "tmt",
-    "iron ore", "metal", "alloy", "psu", "plant",
-    "import", "policy"
-]
+# Keywords to filter
+keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
 
-def filter_entry(entry):
-    text = (entry.get("title", "") + " " + entry.get("summary", "")).lower()
-    return any(kw in text for kw in keywords)
+# Helper: filter entries
+def filter_entries(entries, keyword, month_filter):
+    filtered = []
+    for entry in entries:
+        title = entry.get("title", "").lower()
+        summary = entry.get("summary", "").lower()
+        published = entry.get("published", "")
+        pub_date = None
 
-def clean_html(raw_html):
-    cleanr = re.compile('<.*?>')
-    return re.sub(cleanr, '', raw_html)
+        try:
+            pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %Z")
+        except:
+            try:
+                pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %z")
+            except:
+                continue
 
-def fetch_all_news():
-    articles = []
-    for source, url in feeds.items():
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
-            if filter_entry(entry):
-                title = entry.get("title", "")
-                summary = clean_html(entry.get("summary", ""))[:300] + "..."
-                link = entry.get("link", "")
-                published = entry.get("published", "")
+        if keyword and keyword.lower() not in title and keyword.lower() not in summary:
+            continue
 
-                try:
-                    published_parsed = dateparser.parse(published)
-                    month_str = published_parsed.strftime("%B")
-                    date_str = published_parsed.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    month_str = "Unknown"
-                    date_str = ""
+        if month_filter:
+            year, month = month_filter.split("-")
+            if pub_date.year != int(year) or pub_date.month != int(month):
+                continue
 
-                articles.append({
-                    "source": source,
-                    "title": title,
-                    "summary": summary,
-                    "link": link,
-                    "published": date_str,
-                    "month": month_str
-                })
-    return sorted(articles, key=lambda x: x['published'], reverse=True)
+        filtered.append({
+            "title": entry.get("title"),
+            "link": entry.get("link"),
+            "published": pub_date,
+            "source": entry.get("source", {}).get("title", "Unknown")
+        })
+
+    return filtered
 
 @app.route("/")
 def index():
-    keyword = request.args.get("keyword", "").lower()
+    keyword = request.args.get("keyword", "").strip()
     category = request.args.get("category", "")
-    month = request.args.get("month", "")
+    month = request.args.get("month")
 
-    articles = fetch_all_news()
-
-    filtered = []
-    for article in articles:
-        if keyword and keyword not in article["title"].lower():
+    all_news = []
+    for source, url in feeds.items():
+        if category and category != source:
             continue
-        if category and article["source"] != category:
-            continue
-        if month and article["month"] != month:
-            continue
-        filtered.append(article)
 
-    categories = sorted(set(article["source"] for article in articles))
-    months = sorted(set(article["month"] for article in articles if article["month"] != "Unknown"))
+        parsed = feedparser.parse(url)
+        entries = parsed.entries
+        news_items = filter_entries(entries, keyword, month)
+        for item in news_items:
+            item["source"] = source
+        all_news.extend(news_items)
 
-    return render_template("dashboard.html", articles=filtered or articles, keyword=keyword,
-                           selected_category=category, selected_month=month,
-                           categories=categories, months=months)
+    all_news.sort(key=lambda x: x["published"], reverse=True)
+
+    # Month dropdown (last 12 months)
+    months = []
+    today = datetime.today()
+    for i in range(12):
+        date = datetime(today.year, today.month, 1)
+        month_date = date.replace(month=((date.month - i - 1) % 12 + 1),
+                                  year=date.year - ((i + (12 - date.month)) // 12))
+        months.append((month_date.strftime("%Y-%m"), month_date.strftime("%B %Y")))
+
+    return render_template("dashboard.html", news=all_news, keyword=keyword,
+                           category=category, selected_month=month, months=months)
 
 if __name__ == "__main__":
     app.run(debug=True)
