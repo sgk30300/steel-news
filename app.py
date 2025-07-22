@@ -14,7 +14,7 @@ steel_keywords = [
     "steel exports", "steel demand", "steel policy", "metal industry"
 ]
 
-# Feeds from reliable sources
+# RSS feeds from multiple sources
 feeds = {
     "Google News": "https://news.google.com/rss/search?q=steel+OR+iron+ore+OR+tmt+OR+metal+OR+sail+OR+nmdc&hl=en-IN&gl=IN&ceid=IN:en",
     "Economic Times": "https://economictimes.indiatimes.com/industry/indl-goods/svs/steel/rssfeeds/13376306.cms",
@@ -28,17 +28,17 @@ def is_relevant(title, summary, keywords, threshold=1):
 def get_filtered_entries():
     entries = []
     for source, url in feeds.items():
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
+        d = feedparser.parse(url)
+        for entry in d.entries:
             if hasattr(entry, 'published_parsed'):
                 published_dt = datetime(*entry.published_parsed[:6])
                 title = entry.title
                 summary = entry.get('summary', '')
 
-                # ✅ Apply keyword filtering only to Google News
-                if source == "Google News":
-                    if not is_relevant(title, summary, steel_keywords):
-                        continue
+                # Apply steel keyword filtering to all sources
+                threshold = 1 if source == "Google News" else 2
+                if not is_relevant(title, summary, steel_keywords, threshold=threshold):
+                    continue
 
                 entries.append({
                     'title': title,
@@ -56,7 +56,7 @@ def get_last_3_months():
     for i in range(3):
         date = now - timedelta(days=i * 30)
         months.append(date.strftime('%B %Y'))
-    return list(dict.fromkeys(months))
+    return list(dict.fromkeys(months))  # remove duplicates
 
 @app.route("/", methods=["GET"])
 def index():
@@ -66,12 +66,15 @@ def index():
 
     news = get_filtered_entries()
 
+    # Filter by selected month
     if month and month != "All Months":
         news = [n for n in news if n['date'].strftime('%B %Y') == month]
 
+    # Filter by source
     if source:
         news = [n for n in news if n['source'] == source]
 
+    # Filter by keyword
     if keyword:
         news = [n for n in news if keyword in n['title'].lower() or keyword in n['summary'].lower()]
 
