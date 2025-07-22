@@ -1,5 +1,7 @@
 flask
-feedparser
 gunicorn
-pandas
+feedparser
 openpyxl
+pandas
+requests
+beautifulsoup4

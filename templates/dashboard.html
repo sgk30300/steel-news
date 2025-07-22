@@ -1,48 +1,67 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Steel News Dashboard by Hashtagsteel</title>
-    <meta name="description" content="Stay updated with the latest steel industry news from Google News, Economic Times, and Mint. Powered by Hashtagsteel.">
-    <meta name="keywords" content="steel news, steel industry, Hashtagsteel, India steel updates">
+    <meta name="description" content="Live updates from Google News, Mint, and Economic Times about the Steel industry. Built by Hashtagsteel.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
-        header { background: #202020; padding: 20px; color: white; text-align: center; }
-        .banner { width: 100%; max-height: 400px; object-fit: cover; }
-        .search-bar { margin: 20px; text-align: center; }
-        .search-bar input, .search-bar select { padding: 10px; margin: 5px; width: 200px; }
-        .article { background: white; margin: 10px 20px; padding: 15px; border-radius: 5px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
-        .article a { text-decoration: none; color: #007BFF; font-weight: bold; }
-        .article small { color: #666; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { margin-bottom: 10px; }
+        .filters input, .filters select { margin-right: 10px; padding: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ccc; }
+        th { background: #f5f5f5; }
+        tr:hover { background: #f0f8ff; }
+        .summary { font-size: 0.9em; color: #666; }
+        .top-banner { width: 100%; height: 200px; background: url("/static/banner.jpg") no-repeat center/cover; border-radius: 8px; margin-bottom: 20px; }
     </style>
-    <script>
-        setInterval(() => { window.location.reload(); }, 900000);
-    </script>
 </head>
 <body>
-    <header>
-        <h1>Steel News Dashboard by Hashtagsteel</h1>
-    </header>
-    <img src="/static/banner.jpg" alt="Steel News Banner" class="banner">
-    <div class="search-bar">
-        <form method="get">
-            <input type="text" name="keyword" placeholder="Search by keyword">
-            <select name="source">
-                <option value="">All Sources</option>
-                {% for source in sources %}
-                <option value="{{ source }}">{{ source }}</option>
-                {% endfor %}
-            </select>
-            <input type="date" name="date">
-            <button type="submit">Search</button>
-        </form>
-    </div>
-    {% for article in articles %}
-    <div class="article">
-        <a href="{{ article.link }}" target="_blank">{{ article.title }}</a><br>
-        <small>{{ article.published }} | {{ article.source }}</small>
-    </div>
-    {% endfor %}
+    <div class="top-banner"></div>
+    <h1>Steel News Dashboard by Hashtagsteel</h1>
+
+    <form class="filters" method="get">
+        <input type="text" name="keyword" placeholder="Search..." value="{{ request.args.get('keyword', '') }}">
+        <select name="source">
+            <option value="">All Sources</option>
+            {% for src in sources %}
+                <option value="{{ src }}" {% if src == request.args.get('source') %}selected{% endif %}>{{ src }}</option>
+            {% endfor %}
+        </select>
+        <select name="month">
+            <option value="">All Months</option>
+            {% for m in months %}
+                <option value="{{ m }}" {% if m == request.args.get('month') %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="category" placeholder="Category (e.g. TMT, MSME)">
+        <button type="submit">Apply Filters</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Title & Summary</th>
+                <th>Source</th>
+                <th>Link</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in articles %}
+                <tr>
+                    <td>{{ a.published.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <strong>{{ a.title }}</strong><br>
+                        <div class="summary">{{ a.summary }}</div>
+                    </td>
+                    <td>{{ a.source }}</td>
+                    <td><a href="{{ a.link }}" target="_blank">View</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>
