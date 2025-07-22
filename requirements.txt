@@ -1,5 +1,5 @@
 flask
 feedparser
+gunicorn
 pandas
 openpyxl
-gunicorn

@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Steel News Dashboard by Hashtagsteel</title>
+    <meta name="description" content="Stay updated with the latest steel industry news from Google News, Economic Times, and Mint. Powered by Hashtagsteel.">
+    <meta name="keywords" content="steel news, steel industry, Hashtagsteel, India steel updates">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+        header { background: #202020; padding: 20px; color: white; text-align: center; }
+        .banner { width: 100%; max-height: 400px; object-fit: cover; }
+        .search-bar { margin: 20px; text-align: center; }
+        .search-bar input, .search-bar select { padding: 10px; margin: 5px; width: 200px; }
+        .article { background: white; margin: 10px 20px; padding: 15px; border-radius: 5px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+        .article a { text-decoration: none; color: #007BFF; font-weight: bold; }
+        .article small { color: #666; }
+    </style>
+    <script>
+        setInterval(() => { window.location.reload(); }, 900000);
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Steel News Dashboard by Hashtagsteel</h1>
+    </header>
+    <img src="/static/banner.jpg" alt="Steel News Banner" class="banner">
+    <div class="search-bar">
+        <form method="get">
+            <input type="text" name="keyword" placeholder="Search by keyword">
+            <select name="source">
+                <option value="">All Sources</option>
+                {% for source in sources %}
+                <option value="{{ source }}">{{ source }}</option>
+                {% endfor %}
+            </select>
+            <input type="date" name="date">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+    {% for article in articles %}
+    <div class="article">
+        <a href="{{ article.link }}" target="_blank">{{ article.title }}</a><br>
+        <small>{{ article.published }} | {{ article.source }}</small>
+    </div>
+    {% endfor %}
+</body>
+</html>
