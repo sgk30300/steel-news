@@ -34,11 +34,16 @@ def get_filtered_entries():
         for entry in d.entries:
             if hasattr(entry, 'published_parsed'):
                 published_dt = datetime(*entry.published_parsed[:6])
-                title = entry.title
-                summary = entry.get('summary', '')
+                title = entry.title.strip()
+                summary = entry.get('summary', '').strip()
 
+                # Filter irrelevant articles
                 if not is_relevant(title, summary, steel_keywords):
                     continue
+
+                # Skip repeating summary (same as title or starts with title)
+                if summary.lower().startswith(title.lower()):
+                    summary = ""
 
                 entries.append({
                     'title': title,
@@ -47,6 +52,7 @@ def get_filtered_entries():
                     'date': published_dt,
                     'source': source
                 })
+
     return sorted(entries, key=lambda x: x['date'], reverse=True)
 
 # Month filter dropdown (3 months max)
