@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request
 import feedparser
 from datetime import datetime
-import re
+from dateutil import parser as date_parser
+import pytz
 
 app = Flask(__name__)
 
@@ -13,75 +14,69 @@ feeds = {
     "PIB - Steel": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
 }
 
-keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
+keywords = [
+    "steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy",
+    "psu", "plant", "import", "policy", "rebar", "scrap", "furnace"
+]
 
-def filter_articles(entries, keyword, month, category):
-    filtered = []
-    for entry in entries:
-        title = entry.get("title", "")
-        summary = entry.get("summary", "")
-        published = entry.get("published", "")
-        source = entry.get("source", "")
-        link = entry.get("link", "")
-
-        # Filter by keyword
-        if keyword and keyword.lower() not in title.lower() + summary.lower():
+def fetch_steel_news(keyword=None, category=None, month=None):
+    articles = []
+    for source_name, feed_url in feeds.items():
+        if category and category != source_name:
             continue
 
-        # Filter by category
-        if category and category != source:
-            continue
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries:
+            title = entry.get("title", "")
+            link = entry.get("link", "")
+            published_str = entry.get("published", "") or entry.get("updated", "")
 
-        # Filter by month
-        if month:
             try:
-                pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %Z")
-            except ValueError:
-                try:
-                    pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %z")
-                except ValueError:
-                    continue
+                published_dt = date_parser.parse(published_str)
+                if not published_dt.tzinfo:
+                    published_dt = pytz.utc.localize(published_dt)
+            except Exception:
+                published_dt = datetime.now(pytz.utc)
 
-            if pub_date.strftime("%Y-%m") != month:
+            title_lower = title.lower()
+            if not any(word in title_lower for word in keywords):
                 continue
 
-        filtered.append({
-            "title": title,
-            "summary": summary,
-            "link": link,
-            "published": published,
-            "source": source
-        })
-    return filtered
+            if keyword and keyword.lower() not in title_lower:
+                continue
+
+            if month:
+                try:
+                    if published_dt.strftime("%B") != month:
+                        continue
+                except:
+                    pass
+
+            articles.append({
+                "title": title,
+                "link": link,
+                "source": source_name,
+                "date": published_dt
+            })
+
+    articles.sort(key=lambda x: x["date"], reverse=True)
+    return articles
 
 @app.route("/")
-def home():
+def dashboard():
     keyword = request.args.get("keyword", "")
     category = request.args.get("category", "")
     month = request.args.get("month", "")
 
-    articles = []
-    for source, url in feeds.items():
-        parsed = feedparser.parse(url)
-        for entry in parsed.entries:
-            entry["source"] = source
-            # Only keep entries that match keywords
-            if any(kw in entry.title.lower() + entry.get("summary", "").lower() for kw in keywords):
-                articles.append(entry)
-
-    filtered = filter_articles(articles, keyword, month, category)
-
-    # Extract available months for filter dropdown
-    months = sorted({datetime.strptime(a.published, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m")
-                    for a in articles if hasattr(a, "published")}, reverse=True)
-
-    return render_template("index.html",
-                           articles=filtered,
-                           keyword=keyword,
-                           category=category,
-                           month=month,
-                           months=months,
-                           categories=list(feeds.keys()))
+    articles = fetch_steel_news(keyword=keyword, category=category, month=month)
+    available_months = sorted({article["date"].strftime("%B") for article in articles})
+    return render_template("dashboard.html",
+                           articles=articles,
+                           selected_keyword=keyword,
+                           selected_category=category,
+                           selected_month=month,
+                           available_months=available_months,
+                           categories=["All Sources"] + list(feeds.keys()))
 
 if __name__ == "__main__":
     app.run(debug=True)
