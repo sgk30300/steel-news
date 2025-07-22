@@ -74,12 +74,45 @@ def scrape_mint():
 
 def fetch_steel_news(keyword="steel", category=None, month=None, source=None):
     articles = []
+
     if not source or source == "Google News":
-        articles.extend(scrape_google_news(keyword))
+        try:
+            g_news = scrape_google_news(keyword)
+            print(f"✅ Google News: {len(g_news)} articles")
+            articles.extend(g_news)
+        except Exception as e:
+            print(f"❌ Google News error: {e}")
+
     if not source or source == "Economic Times":
-        articles.extend(scrape_economic_times())
+        try:
+            et_news = scrape_economic_times()
+            print(f"✅ Economic Times: {len(et_news)} articles")
+            articles.extend(et_news)
+        except Exception as e:
+            print(f"❌ Economic Times error: {e}")
+
     if not source or source == "Mint":
-        articles.extend(scrape_mint())
+        try:
+            mint_news = scrape_mint()
+            print(f"✅ Mint: {len(mint_news)} articles")
+            articles.extend(mint_news)
+        except Exception as e:
+            print(f"❌ Mint error: {e}")
+
+    # Filter
+    filtered = []
+    for article in articles:
+        if category and category.lower() not in article["title"].lower():
+            continue
+        if month and article["date"].strftime("%B %Y") != month:
+            continue
+        filtered.append(article)
+
+    filtered.sort(key=lambda x: x["date"], reverse=True)
+
+    # Build month list from all articles (not filtered)
+    unique_months = sorted({a["date"].strftime("%B %Y") for a in articles}, reverse=True)
+    return filtered, unique_months, ["Google News", "Economic Times", "Mint"]
 
     # Filter
     filtered = []
