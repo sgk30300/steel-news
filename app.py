@@ -1,108 +1,87 @@
 from flask import Flask, render_template, request
-from bs4 import BeautifulSoup
-import requests
+import feedparser
 from datetime import datetime
-from dateutil import parser as date_parser
-import pytz
+import re
 
 app = Flask(__name__)
 
-def fetch_google_news():
-    url = "https://news.google.com/search?q=steel&hl=en-IN&gl=IN&ceid=IN:en"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(url, headers=headers, timeout=15)
-    soup = BeautifulSoup(res.text, "html.parser")
-    articles = []
+feeds = {
+    "Google News - Steel Industry": "https://news.google.com/rss/search?q=Steel+Industry+India",
+    "Economic Times": "https://economictimes.indiatimes.com/rssfeeds/2146842.cms",
+    "Mint": "https://www.livemint.com/rss/opinion",
+    "Business Standard": "https://www.business-standard.com/rss/home_page_top_stories.rss",
+    "PIB - Steel": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
+}
 
-    for item in soup.select("article"):
-        headline_tag = item.find("h3") or item.find("h4")
-        if headline_tag:
-            title = headline_tag.get_text(strip=True)
-            link_tag = headline_tag.find("a")
-            if link_tag and link_tag.get("href"):
-                url = link_tag["href"]
-                if url.startswith("."):
-                    url = "https://news.google.com" + url[1:]
-                if "steel" in title.lower():
-                    articles.append({
-                        "title": title,
-                        "link": url,
-                        "source": "Google News",
-                        "category": "General",
-                        "date": datetime.now(pytz.utc)
-                    })
-    return articles
+keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
 
-def fetch_mint_news():
-    url = "https://www.livemint.com/Search/Link/Keyword/steel"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(url, headers=headers, timeout=15)
-    soup = BeautifulSoup(res.text, "html.parser")
-    articles = []
+def filter_articles(entries, keyword, month, category):
+    filtered = []
+    for entry in entries:
+        title = entry.get("title", "")
+        summary = entry.get("summary", "")
+        published = entry.get("published", "")
+        source = entry.get("source", "")
+        link = entry.get("link", "")
 
-    for item in soup.select(".listingPage .listing h2"):
-        title = item.get_text(strip=True)
-        link_tag = item.find("a")
-        if link_tag and link_tag["href"]:
-            url = link_tag["href"]
-            if not url.startswith("http"):
-                url = "https://www.livemint.com" + url
-            if "steel" in title.lower():
-                articles.append({
-                    "title": title,
-                    "link": url,
-                    "source": "Mint",
-                    "category": "Business",
-                    "date": datetime.now(pytz.utc)
-                })
-    return articles
+        # Filter by keyword
+        if keyword and keyword.lower() not in title.lower() + summary.lower():
+            continue
 
-def fetch_steel_news(keyword=None, category=None, month=None, source=None):
-    articles = []
-    if not source or source == "Google News":
-        articles.extend(fetch_google_news())
-    if not source or source == "Mint":
-        articles.extend(fetch_mint_news())
+        # Filter by category
+        if category and category != source:
+            continue
 
-    # Filtering
-    if keyword:
-        articles = [a for a in articles if keyword.lower() in a['title'].lower()]
-    if category:
-        articles = [a for a in articles if a['category'].lower() == category.lower()]
-    if month:
-        articles = [a for a in articles if a['date'].strftime("%B") == month]
+        # Filter by month
+        if month:
+            try:
+                pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %Z")
+            except ValueError:
+                try:
+                    pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %z")
+                except ValueError:
+                    continue
 
-    # Sorting (fixing offset-naive and aware datetime comparison)
-    for a in articles:
-        if a['date'].tzinfo is None:
-            a['date'] = pytz.utc.localize(a['date'])
+            if pub_date.strftime("%Y-%m") != month:
+                continue
 
-    articles.sort(key=lambda x: x['date'], reverse=True)
-    return articles
+        filtered.append({
+            "title": title,
+            "summary": summary,
+            "link": link,
+            "published": published,
+            "source": source
+        })
+    return filtered
 
-@app.route("/", methods=["GET"])
-def dashboard():
-    keyword = request.args.get("keyword", "").strip()
+@app.route("/")
+def home():
+    keyword = request.args.get("keyword", "")
     category = request.args.get("category", "")
     month = request.args.get("month", "")
-    source = request.args.get("source", "")
 
-    news_items = fetch_steel_news(keyword=keyword, category=category, month=month, source=source)
+    articles = []
+    for source, url in feeds.items():
+        parsed = feedparser.parse(url)
+        for entry in parsed.entries:
+            entry["source"] = source
+            # Only keep entries that match keywords
+            if any(kw in entry.title.lower() + entry.get("summary", "").lower() for kw in keywords):
+                articles.append(entry)
 
-    categories = ["General", "Business"]
-    months = [datetime(2025, m, 1).strftime("%B") for m in range(1, 13)]
-    sources = ["Google News", "Mint"]
+    filtered = filter_articles(articles, keyword, month, category)
 
-    return render_template("dashboard.html",
-                           news=news_items,
+    # Extract available months for filter dropdown
+    months = sorted({datetime.strptime(a.published, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m")
+                    for a in articles if hasattr(a, "published")}, reverse=True)
+
+    return render_template("index.html",
+                           articles=filtered,
                            keyword=keyword,
                            category=category,
                            month=month,
-                           source=source,
-                           categories=categories,
                            months=months,
-                           sources=sources,
-                           current_year=datetime.now().year)
+                           categories=list(feeds.keys()))
 
 if __name__ == "__main__":
-    app.run(debug=True, port=10000)
+    app.run(debug=True)
