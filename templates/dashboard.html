@@ -1,61 +1,146 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <meta name="description" content="Steel News Dashboard by Hashtagsteel - Latest steel industry news auto-updated every 15 minutes.">
-    <meta name="keywords" content="Steel News, TMT, Iron Ore, Metal, NMDC, SAIL, Steel Ministry, Steel Plants, Hashtagsteel">
-    <title>Steel News Dashboard by Hashtagsteel</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="description" content="Stay updated with the latest steel industry news from trusted sources like Google News, Economic Times, and Mint.">
+    <meta name="keywords" content="Steel News, TMT, Iron Ore, Metal Industry, Economic Times, Mint, India">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steel News Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #222;
+        }
+
+        header img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            font-weight: 600;
+            text-align: center;
+            margin: 20px 0 10px;
+        }
+
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .filters select,
+        .filters input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            width: 200px;
+        }
+
+        .news-card {
+            background: #fff;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.08);
+        }
+
+        .news-card h2 {
+            margin: 0 0 10px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .news-card p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        .news-card .meta {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .news-card a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 14px;
+            background-color: #004b8d;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .no-news {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 18px;
+            color: #777;
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
-    <header class="w-full bg-white shadow sticky top-0 z-10">
-        <div class="max-w-6xl mx-auto flex items-center justify-between p-4">
-            <img src="/static/banner.jpg" alt="Steel News Banner" class="h-16 object-cover w-full rounded" />
-        </div>
+<body>
+
+    <header>
+        <img src="/static/banner.jpg" alt="Steel News Banner">
     </header>
 
-    <main class="max-w-6xl mx-auto p-4">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
-            <form method="get" class="flex flex-wrap gap-4 w-full md:w-auto">
-                <select name="month" onchange="this.form.submit()" class="px-4 py-2 rounded bg-white border shadow">
+    <div class="container">
+        <form method="GET">
+            <div class="filters">
+                <select name="month" onchange="this.form.submit()">
                     {% for m in months %}
-                    <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ m }}</option>
+                        <option value="{{ m }}" {% if selected_month == m %}selected{% endif %}>{{ m }}</option>
                     {% endfor %}
                 </select>
 
-                <select name="category" onchange="this.form.submit()" class="px-4 py-2 rounded bg-white border shadow">
-                    {% for s in sources %}
-                    <option value="{{ s }}" {% if s == selected_source %}selected{% endif %}>{{ s if s else 'All Sources' }}</option>
+                <select name="category" onchange="this.form.submit()">
+                    <option value="">All Sources</option>
+                    {% for s in sources[1:] %}
+                        <option value="{{ s }}" {% if selected_source == s %}selected{% endif %}>{{ s }}</option>
                     {% endfor %}
                 </select>
 
-                <input type="text" name="keyword" placeholder="Search keyword..." value="{{ keyword }}" class="px-4 py-2 rounded border shadow w-full md:w-auto"/>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">Search</button>
-            </form>
-        </div>
+                <input type="text" name="keyword" placeholder="Search keyword" value="{{ keyword }}">
+                <input type="submit" value="Search" style="padding: 10px 20px; cursor: pointer; background-color: #004b8d; color: white; border: none; border-radius: 5px;">
+            </div>
+        </form>
 
         {% if news %}
-        <div class="grid gap-6">
-            {% for item in news %}
-            <div class="p-4 bg-white rounded shadow hover:shadow-md transition">
-                <a href="{{ item.link }}" target="_blank" class="text-xl font-semibold text-blue-700 hover:underline">{{ item.title }}</a>
-                <p class="text-sm text-gray-500 mt-1">{{ item.date.strftime('%d %B %Y') }} — <span class="font-semibold">{{ item.source }}</span></p>
-                <p class="mt-2 text-gray-700 text-sm">{{ item.summary }}</p>
-            </div>
+            {% for n in news %}
+                <div class="news-card">
+                    <h2>{{ n.title }}</h2>
+                    <p class="meta">{{ n.source }} | {{ n.date.strftime('%d %B %Y') }}</p>
+                    <p>{{ n.summary[:250] }}...</p>
+                    <a href="{{ n.link }}" target="_blank">Read Article</a>
+                </div>
             {% endfor %}
-        </div>
         {% else %}
-        <div class="text-center py-20 bg-white rounded shadow">
-            <h2 class="text-2xl font-semibold text-gray-600 mb-2">No steel-related news found</h2>
-            <p class="text-gray-500">Try changing filters or check back later. News updates every 15 minutes.</p>
-        </div>
+            <div class="no-news">No news found matching the filters.</div>
         {% endif %}
-    </main>
+    </div>
 
-    <footer class="text-center text-sm text-gray-500 mt-10 p-4 border-t">
-        Steel News Dashboard by Hashtagsteel · Auto-updated every 15 mins
-    </footer>
 </body>
 </html>
