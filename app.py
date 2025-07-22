@@ -3,10 +3,10 @@ from bs4 import BeautifulSoup
 import feedparser
 from datetime import datetime
 from urllib.parse import urlparse
+import pytz
 
 app = Flask(__name__)
 
-# RSS Feeds to fetch from
 RSS_FEEDS = {
     'Google News': 'https://news.google.com/rss/search?q=steel&hl=en-IN&gl=IN&ceid=IN:en',
     'Economic Times': 'https://economictimes.indiatimes.com/rssfeeds/industry/indl-goods-/-svs/steel/rssfeeds/13376752.cms',
@@ -14,55 +14,47 @@ RSS_FEEDS = {
     'GMK Center': 'https://gmk.center/en/feed/'
 }
 
-def to_naive_datetime(dt):
-    """Ensure all datetime objects are timezone-naive for consistent sorting."""
-    if dt.tzinfo is not None:
-        return dt.replace(tzinfo=None)
-    return dt
-
 def fetch_steel_news(keyword="", category="", month="", source=""):
     articles = []
-
     for src, url in RSS_FEEDS.items():
         feed = feedparser.parse(url)
         for entry in feed.entries:
-            title = entry.get('title', '')
-            link = entry.get('link', '')
-            summary_html = entry.get('summary', '')
-            published = entry.get('published', '')
+            title = entry.title
+            link = entry.link
+            summary = BeautifulSoup(entry.summary, 'html.parser').text if 'summary' in entry else ''
 
+            # Parse published date and normalize
             try:
-                date_obj = datetime.strptime(published.replace(' GMT', '').strip(), "%a, %d %b %Y %H:%M:%S")
-            except Exception:
-                try:
-                    date_obj = datetime.strptime(published.strip(), "%a, %d %b %Y %H:%M:%S %z").replace(tzinfo=None)
-                except:
-                    date_obj = datetime.now()
+                date_published = entry.published
+                date_obj = datetime(*entry.published_parsed[:6])
+            except:
+                date_obj = datetime.utcnow()
 
-            summary = BeautifulSoup(summary_html, "html.parser").text.strip()
+            date_obj = date_obj.replace(tzinfo=None)  # Fix offset-aware issue
 
-            if "steel" not in title.lower() and "steel" not in summary.lower():
+            # Basic steel relevance check
+            if 'steel' not in title.lower():
                 continue
 
             articles.append({
-                "title": title,
-                "summary": summary,
-                "link": link,
-                "source": src,
-                "date": to_naive_datetime(date_obj)
+                'date': date_obj,
+                'source': src,
+                'title': title,
+                'summary': summary,
+                'link': link
             })
 
-    # Sort by date descending
-    articles.sort(key=lambda x: x["date"], reverse=True)
-
-    # Filters
+    # Filter logic
     if keyword:
-        articles = [a for a in articles if keyword.lower() in a["title"].lower()]
-    if source:
-        articles = [a for a in articles if source == a["source"]]
-    if month:
-        articles = [a for a in articles if a["date"].strftime("%Y-%m") == month]
+        articles = [a for a in articles if keyword.lower() in a['title'].lower()]
 
+    if source:
+        articles = [a for a in articles if a['source'].lower() == source.lower()]
+
+    if month:
+        articles = [a for a in articles if a['date'].strftime('%Y-%m') == month]
+
+    articles.sort(key=lambda x: x['date'], reverse=True)
     return articles
 
 @app.route("/")
@@ -74,7 +66,6 @@ def dashboard():
 
     news_items = fetch_steel_news(keyword=keyword, category=category, month=month, source=source)
 
-    # Build list of available months and sources for dropdowns
     months = sorted(list(set(item['date'].strftime("%Y-%m") for item in news_items)), reverse=True)
     sources = sorted(set(item['source'] for item in news_items))
 
@@ -85,4 +76,9 @@ def dashboard():
                            month=month,
                            source=source,
                            months=months,
-                           sources=sources)
+                           sources=sources,
+                           now=datetime.utcnow(),
+                           current_year=datetime.utcnow().year)
+
+if __name__ == "__main__":
+    app.run(debug=True)
