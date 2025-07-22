@@ -1,75 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Steel News Dashboard by Hashtagsteel</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-        header { width: 100%; height: 400px; background: url('/static/banner.jpg') no-repeat center center; background-size: cover; }
-        .container { padding: 20px; }
-        h1 { text-align: center; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f5f5f5; }
-        .filters { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .filters select { padding: 5px; }
-        .read-more { font-size: 0.9em; color: blue; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Steel News Dashboard by Hashtagsteel</title>
+  <meta name="description" content="Latest curated steel industry news - powered by Hashtagsteel. Updated every 15 minutes.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { background-color: #002244; color: white; padding: 20px; text-align: center; }
+    .news-container { padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .news-card { border: 1px solid #ccc; border-radius: 10px; padding: 15px; background: #f9f9f9; }
+    .news-card h3 { margin-top: 0; }
+    .news-card a { text-decoration: none; color: #007BFF; font-weight: bold; }
+  </style>
 </head>
 <body>
-    <header></header>
-    <div class="container">
-        <h1>Steel News Dashboard by Hashtagsteel</h1>
-        <div class="filters">
-            <form method="get">
-                <label>Source:
-                    <select name="source" onchange="this.form.submit()">
-                        <option value="All">All</option>
-                        {% for source in sources %}
-                        <option value="{{ source }}" {% if request.args.get('source') == source %}selected{% endif %}>{{ source }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label>Month:
-                    <select name="month" onchange="this.form.submit()">
-                        <option value="All">All</option>
-                        {% for month in months %}
-                        <option value="{{ month }}" {% if request.args.get('month') == month %}selected{% endif %}>{{ month }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label>Category:
-                    <select name="category" onchange="this.form.submit()">
-                        <option value="All">All</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-            </form>
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Title</th>
-                    <th>Summary</th>
-                    <th>Source</th>
-                    <th>Link</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for article in articles %}
-                <tr>
-                    <td>{{ article.date }}</td>
-                    <td>{{ article.title }}</td>
-                    <td>{{ article.summary }}</td>
-                    <td>{{ article.source }}</td>
-                    <td><a class="read-more" href="{{ article.link }}" target="_blank">Read full article →</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <header>
+    <h1>Steel News Dashboard by Hashtagsteel</h1>
+  </header>
+  <div class="news-container">
+    {% for news in news_items %}
+    <div class="news-card">
+      <h3>{{ news.title }}</h3>
+      <p><small>{{ news.date }} | {{ news.source }}</small></p>
+      <a href="{{ news.link }}" target="_blank">Read full article →</a>
     </div>
+    {% endfor %}
+  </div>
 </body>
 </html>
