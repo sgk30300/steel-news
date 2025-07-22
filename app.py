@@ -1,86 +1,115 @@
-# ---------------- app.py ----------------
 from flask import Flask, render_template, request
 import feedparser
-from datetime import datetime
-from urllib.parse import quote
+from bs4 import BeautifulSoup
+from datetime import datetime, timezone
+from dateutil import parser as date_parser
+import pytz
 
 app = Flask(__name__)
 
-# Define RSS feeds
 feeds = {
-    "Google News": "https://news.google.com/rss/search?q=Steel+Industry+India",
+    "Google News - Steel Industry": "https://news.google.com/rss/search?q=Steel+Industry+India",
     "Economic Times": "https://economictimes.indiatimes.com/rssfeeds/2146842.cms",
-    "Mint": "https://www.livemint.com/rss/opinion"
+    "Mint": "https://www.livemint.com/rss/opinion",
+    "Business Standard": "https://www.business-standard.com/rss/home_page_top_stories.rss",
+    "PIB - Steel": "https://pib.gov.in/RssFeeds.aspx?Type=Release"
 }
 
-# Keywords to filter
 keywords = ["steel", "ministry", "sail", "nmdc", "tmt", "iron ore", "metal", "alloy", "psu", "plant", "import", "policy"]
 
-# Helper: filter entries
-def filter_entries(entries, keyword, month_filter):
-    filtered = []
-    for entry in entries:
-        title = entry.get("title", "").lower()
-        summary = entry.get("summary", "").lower()
-        published = entry.get("published", "")
-        pub_date = None
 
-        try:
-            pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %Z")
-        except:
-            try:
-                pub_date = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %z")
-            except:
-                continue
+def clean_html(html):
+    return BeautifulSoup(html, "html.parser").get_text()
 
-        if keyword and keyword.lower() not in title and keyword.lower() not in summary:
+
+def make_naive(dt):
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
+def fetch_news(source_filter=None, keyword_filter=None, month_filter=None):
+    all_items = []
+    now = datetime.now()
+
+    for source_name, url in feeds.items():
+        if source_filter and source_filter != source_name:
             continue
 
-        if month_filter:
-            year, month = month_filter.split("-")
-            if pub_date.year != int(year) or pub_date.month != int(month):
-                continue
+        feed = feedparser.parse(url)
 
-        filtered.append({
-            "title": entry.get("title"),
-            "link": entry.get("link"),
-            "published": pub_date,
-            "source": entry.get("source", {}).get("title", "Unknown")
-        })
+        for entry in feed.entries:
+            title = entry.get("title", "")
+            summary = clean_html(entry.get("summary", ""))
+            link = entry.get("link", "")
+            published_raw = entry.get("published", entry.get("updated", now.isoformat()))
 
-    return filtered
+            try:
+                published = date_parser.parse(published_raw)
+            except Exception:
+                published = now
+
+            if month_filter:
+                if published.year != month_filter.year or published.month != month_filter.month:
+                    continue
+
+            if keyword_filter:
+                keyword_match = any(kw.lower() in (title + summary).lower() for kw in keyword_filter)
+                if not keyword_match:
+                    continue
+
+            all_items.append({
+                "title": title,
+                "summary": summary,
+                "link": link,
+                "source": source_name,
+                "published": published
+            })
+
+    all_items.sort(key=lambda x: make_naive(x["published"]), reverse=True)
+    return all_items
+
+
+def get_month_list():
+    now = datetime.now()
+    months = []
+    for i in range(12):
+        month = (now.month - i - 1) % 12 + 1
+        year = now.year if now.month - i > 0 else now.year - 1
+        label = f"{datetime(year, month, 1).strftime('%B %Y')}"
+        value = f"{year}-{month:02}"
+        months.append({"label": label, "value": value})
+    return months
+
 
 @app.route("/")
 def index():
-    keyword = request.args.get("keyword", "").strip()
-    category = request.args.get("category", "")
-    month = request.args.get("month")
+    selected_source = request.args.get("source")
+    selected_month = request.args.get("month")
 
-    all_news = []
-    for source, url in feeds.items():
-        if category and category != source:
-            continue
+    month_dt = None
+    if selected_month:
+        try:
+            month_dt = datetime.strptime(selected_month, "%Y-%m")
+        except ValueError:
+            month_dt = None
 
-        parsed = feedparser.parse(url)
-        entries = parsed.entries
-        news_items = filter_entries(entries, keyword, month)
-        for item in news_items:
-            item["source"] = source
-        all_news.extend(news_items)
+    news_items = fetch_news(
+        source_filter=selected_source,
+        keyword_filter=keywords,
+        month_filter=month_dt
+    )
 
-    all_news.sort(key=lambda x: x["published"], reverse=True)
+    months = get_month_list()
+    sources = list(feeds.keys())
 
-    # Month dropdown (last 12 months)
-    months = []
-    today = datetime.today()
-    for i in range(12):
-        date = datetime(today.year, today.month, 1)
-        month_date = date.replace(month=((date.month - i - 1) % 12 + 1),
-                                  year=date.year - ((i + (12 - date.month)) // 12))
-        months.append((month_date.strftime("%Y-%m"), month_date.strftime("%B %Y")))
+    return render_template("dashboard.html",
+                           news=news_items,
+                           selected_source=selected_source,
+                           selected_month=selected_month,
+                           months=months,
+                           sources=sources)
 
-    return render_template("dashboard.html", news=all_news, keyword=keyword,
-                           category=category, selected_month=month, months=months)
 
 if __name__ == "__main__":
     app.run(debug=True)
