@@ -22,7 +22,7 @@ feeds = {
 }
 
 # Filter logic
-def is_relevant(title, summary, keywords, threshold=1):
+def is_relevant(title, summary, keywords, threshold=2):
     text = (title + " " + summary).lower()
     return sum(kw in text for kw in keywords) >= threshold
 
