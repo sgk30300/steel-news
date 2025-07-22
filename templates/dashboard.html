@@ -3,65 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <title>Steel News Dashboard by Hashtagsteel</title>
-    <meta name="description" content="Live updates from Google News, Mint, and Economic Times about the Steel industry. Built by Hashtagsteel.">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { margin-bottom: 10px; }
-        .filters input, .filters select { margin-right: 10px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; border-bottom: 1px solid #ccc; }
-        th { background: #f5f5f5; }
-        tr:hover { background: #f0f8ff; }
-        .summary { font-size: 0.9em; color: #666; }
-        .top-banner { width: 100%; height: 200px; background: url("/static/banner.jpg") no-repeat center/cover; border-radius: 8px; margin-bottom: 20px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        header { width: 100%; height: 400px; background: url('/static/banner.jpg') no-repeat center center; background-size: cover; }
+        .container { padding: 20px; }
+        h1 { text-align: center; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f5f5f5; }
+        .filters { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .filters select { padding: 5px; }
+        .read-more { font-size: 0.9em; color: blue; }
     </style>
 </head>
 <body>
-    <div class="top-banner"></div>
-    <h1>Steel News Dashboard by Hashtagsteel</h1>
-
-    <form class="filters" method="get">
-        <input type="text" name="keyword" placeholder="Search..." value="{{ request.args.get('keyword', '') }}">
-        <select name="source">
-            <option value="">All Sources</option>
-            {% for src in sources %}
-                <option value="{{ src }}" {% if src == request.args.get('source') %}selected{% endif %}>{{ src }}</option>
-            {% endfor %}
-        </select>
-        <select name="month">
-            <option value="">All Months</option>
-            {% for m in months %}
-                <option value="{{ m }}" {% if m == request.args.get('month') %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-        </select>
-        <input type="text" name="category" placeholder="Category (e.g. TMT, MSME)">
-        <button type="submit">Apply Filters</button>
-    </form>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Title & Summary</th>
-                <th>Source</th>
-                <th>Link</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for a in articles %}
+    <header></header>
+    <div class="container">
+        <h1>Steel News Dashboard by Hashtagsteel</h1>
+        <div class="filters">
+            <form method="get">
+                <label>Source:
+                    <select name="source" onchange="this.form.submit()">
+                        <option value="All">All</option>
+                        {% for source in sources %}
+                        <option value="{{ source }}" {% if request.args.get('source') == source %}selected{% endif %}>{{ source }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Month:
+                    <select name="month" onchange="this.form.submit()">
+                        <option value="All">All</option>
+                        {% for month in months %}
+                        <option value="{{ month }}" {% if request.args.get('month') == month %}selected{% endif %}>{{ month }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Category:
+                    <select name="category" onchange="this.form.submit()">
+                        <option value="All">All</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </form>
+        </div>
+        <table>
+            <thead>
                 <tr>
-                    <td>{{ a.published.strftime('%Y-%m-%d') }}</td>
-                    <td>
-                        <strong>{{ a.title }}</strong><br>
-                        <div class="summary">{{ a.summary }}</div>
-                    </td>
-                    <td>{{ a.source }}</td>
-                    <td><a href="{{ a.link }}" target="_blank">View</a></td>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Summary</th>
+                    <th>Source</th>
+                    <th>Link</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% for article in articles %}
+                <tr>
+                    <td>{{ article.date }}</td>
+                    <td>{{ article.title }}</td>
+                    <td>{{ article.summary }}</td>
+                    <td>{{ article.source }}</td>
+                    <td><a class="read-more" href="{{ article.link }}" target="_blank">Read full article →</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>
