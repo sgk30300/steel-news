@@ -14,6 +14,12 @@ RSS_FEEDS = {
     'GMK Center': 'https://gmk.center/en/feed/'
 }
 
+def to_naive_datetime(dt):
+    """Ensure all datetime objects are timezone-naive for consistent sorting."""
+    if dt.tzinfo is not None:
+        return dt.replace(tzinfo=None)
+    return dt
+
 def fetch_steel_news(keyword="", category="", month="", source=""):
     articles = []
 
@@ -29,7 +35,7 @@ def fetch_steel_news(keyword="", category="", month="", source=""):
                 date_obj = datetime.strptime(published.replace(' GMT', '').strip(), "%a, %d %b %Y %H:%M:%S")
             except Exception:
                 try:
-                    date_obj = datetime.strptime(published.strip(), "%a, %d %b %Y %H:%M:%S %z")
+                    date_obj = datetime.strptime(published.strip(), "%a, %d %b %Y %H:%M:%S %z").replace(tzinfo=None)
                 except:
                     date_obj = datetime.now()
 
@@ -43,10 +49,10 @@ def fetch_steel_news(keyword="", category="", month="", source=""):
                 "summary": summary,
                 "link": link,
                 "source": src,
-                "date": date_obj
+                "date": to_naive_datetime(date_obj)
             })
 
-    # Sort by date
+    # Sort by date descending
     articles.sort(key=lambda x: x["date"], reverse=True)
 
     # Filters
