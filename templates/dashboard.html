@@ -1,56 +1,145 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="900"> <!-- Auto-refresh every 15 min -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Steel News Dashboard by Hashtagsteel - stay updated with the latest news about the steel industry from trusted sources like Google News, ET, Mint, and GMK.">
-    <title>Steel News Dashboard by Hashtagsteel</title>
+    <meta name="description" content="Stay updated with the latest steel industry news from top sources like Mint, Economic Times, and Google News.">
+    <meta name="keywords" content="Steel News, Steel Industry Updates, Hashtagsteel, Economic Times Steel, Mint Steel, Steel Procurement, Steel Prices, Steel RSS Feed">
+    <meta name="author" content="Hashtagsteel">
+    <title>Steel News Dashboard - Powered by Hashtagsteel</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        h1 { text-align: center; margin-bottom: 10px; }
-        .filters { margin-bottom: 15px; text-align: center; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f0f0f0; }
-        .read-btn { background-color: #1e90ff; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px; }
-        .read-btn:hover { background-color: #0b76d1; }
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+
+        .banner {
+            background: url("/static/banner.jpg") center/cover no-repeat;
+            height: 400px;
+        }
+
+        .container {
+            max-width: 1080px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            display: none; /* For SEO only */
+        }
+
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        input[type="text"], select {
+            padding: 10px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            background-color: #005bbb;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #004799;
+        }
+
+        .news-card {
+            background-color: #fff;
+            border-left: 4px solid #005bbb;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .news-card:hover {
+            transform: scale(1.01);
+        }
+
+        .news-meta {
+            font-size: 13px;
+            color: #777;
+            margin-bottom: 5px;
+        }
+
+        .news-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .read-btn {
+            display: inline-block;
+            margin-top: 8px;
+            color: #005bbb;
+            text-decoration: underline;
+            font-size: 14px;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 13px;
+            padding: 20px;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
-    <h1>Steel News Dashboard by Hashtagsteel</h1>
-    <div class="filters">
-        <form method="get">
-            <input type="text" name="search" placeholder="Search headlines..." value="{{ search_query }}">
+
+    <h1>Steel News Dashboard - Latest Steel Industry News & Updates | Hashtagsteel</h1>
+
+    <div class="banner"></div>
+
+    <div class="container">
+        <form method="GET">
+            <input type="text" name="keyword" placeholder="Search news..." value="{{ keyword }}">
+            <select name="category">
+                <option value="">All Categories</option>
+                <option value="Economic Times" {% if category == "Economic Times" %}selected{% endif %}>Economic Times</option>
+                <option value="Mint" {% if category == "Mint" %}selected{% endif %}>Mint</option>
+                <option value="Google News" {% if category == "Google News" %}selected{% endif %}>Google News</option>
+                <option value="GMK Center" {% if category == "GMK Center" %}selected{% endif %}>GMK Center</option>
+            </select>
             <select name="month">
                 <option value="">All Months</option>
-                {% for month in unique_months %}
-                    <option value="{{ month }}" {% if selected_month == month %}selected{% endif %}>{{ month }}</option>
+                {% for m in unique_months %}
+                    <option value="{{ m }}" {% if selected_month == m %}selected{% endif %}>{{ m }}</option>
                 {% endfor %}
             </select>
             <button type="submit">Filter</button>
         </form>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Headline</th>
-                <th>Source</th>
-                <th>Read</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for news in news %}
-            <tr>
-                <td>{{ news.date.strftime('%Y-%m-%d') }}</td>
-                <td>{{ news.title }}</td>
-                <td>{{ news.source }}</td>
-                <td><a href="{{ news.link }}" target="_blank" class="read-btn">Read Article</a></td>
-            </tr>
+
+        {% if news %}
+            {% for item in news %}
+                <div class="news-card">
+                    <div class="news-meta">{{ item.date.strftime('%d %b %Y') }} | {{ item.source }}</div>
+                    <div class="news-title">{{ item.title }}</div>
+                    <a class="read-btn" href="{{ item.link }}" target="_blank" rel="noopener noreferrer">Read Article →</a>
+                </div>
             {% endfor %}
-        </tbody>
-    </table>
+        {% else %}
+            <p>No steel news found matching the filters.</p>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        &copy; {{ now().year }} Hashtagsteel. All rights reserved.
+    </div>
+
 </body>
 </html>
